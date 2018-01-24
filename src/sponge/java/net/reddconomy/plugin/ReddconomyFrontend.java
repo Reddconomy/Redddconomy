@@ -265,8 +265,11 @@ public class ReddconomyFrontend implements CommandListener{
 							UUID sellerUUID=seller.getUniqueId();
 							String[] values = line1.split(",");
 							long amount=(long)(Double.parseDouble(values[0])*100000000L);
-							int delay = Integer.parseInt(values[1]);
-							if(delay<=0)delay=1;
+							int delay=100;
+							if (values.length>1) {
+								int parsed_delay=Integer.parseInt(values[1]);
+								if (parsed_delay>=0) delay=parsed_delay;
+							}
 							try{
 								if(player!=seller||DEBUG){
 									String cID=ReddconomyApi.createContract(amount,sellerUUID);
