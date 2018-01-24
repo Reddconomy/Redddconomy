@@ -27,6 +27,8 @@ import net.reddconomy.plugin.utils.Help;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.inject.Inject;
+
+import org.spongepowered.api.data.Transaction;
 import org.spongepowered.api.data.key.Keys;
 import org.spongepowered.api.plugin.Plugin;
 import org.spongepowered.api.scheduler.Task;
@@ -38,6 +40,7 @@ import org.spongepowered.api.world.Location;
 import org.spongepowered.api.world.World;
 import org.spongepowered.api.Game;
 import org.spongepowered.api.Sponge;
+import org.spongepowered.api.block.BlockSnapshot;
 import org.spongepowered.api.block.BlockState;
 import org.spongepowered.api.block.BlockType;
 import org.spongepowered.api.block.BlockTypes;
@@ -52,6 +55,7 @@ import org.spongepowered.api.config.ConfigDir;
 import org.spongepowered.api.entity.living.player.Player;
 import org.spongepowered.api.event.Listener;
 import org.spongepowered.api.event.Order;
+import org.spongepowered.api.event.block.ChangeBlockEvent;
 import org.spongepowered.api.event.block.InteractBlockEvent;
 import org.spongepowered.api.event.block.tileentity.ChangeSignEvent;
 import org.spongepowered.api.event.game.state.GameInitializationEvent;
@@ -67,7 +71,9 @@ import java.net.URL;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -82,6 +88,7 @@ public class ReddconomyFrontend implements CommandListener{
 	private boolean PLUGIN_CONTRACT_SIGNS;
 	private boolean CAN_RUN=true;
 	private boolean DEBUG;
+	private final Map<Location<World>,Boolean> _ACTIVATED_SIGNS=new WeakHashMap<Location<World>,Boolean>();
 	private final ConcurrentLinkedQueue<String> _PENDING_DEPOSITS=new ConcurrentLinkedQueue<String>();
 	
 	// CONFIG BLOCK
@@ -146,7 +153,7 @@ public class ReddconomyFrontend implements CommandListener{
 		API_QR=config.get("qr").toString();
 		PLUGIN_CONTRACT_SIGNS=(boolean)config.get("csigns");
 		DEBUG=(boolean)config.get("debug");
-		int version=(int)config.get("ConfigVersion");
+		int version=((Number)config.get("ConfigVersion")).intValue();
 		logger.log(Level.INFO,"Configfile version is "+version+".");
 		
 		
@@ -227,9 +234,7 @@ public class ReddconomyFrontend implements CommandListener{
 				TileEntity tile=location.getTileEntity().get();
 				if(tile instanceof Dispenser||tile instanceof Dropper){
 					if(!FrontendUtils.canPlayerOpen(location,player.getName())&&!FrontendUtils.isOp(player)){
-
 						player.sendMessage(Text.of(TextColors.DARK_RED,"[CONTRACT] Only the owner can open this container."));
-						if(FrontendUtils.isOp(player)) player.sendMessage(Text.of("You're op btw."));
 						event.setCancelled(true);
 					}
 				}
@@ -258,15 +263,19 @@ public class ReddconomyFrontend implements CommandListener{
 						if(line0.equals("[CONTRACT]")){
 							Player seller=Sponge.getServer().getPlayer(line3).get();
 							UUID sellerUUID=seller.getUniqueId();
-							long ammount=(long)(Double.parseDouble(line1)*100000000L);
+							String[] values = line1.split(",");
+							long amount=(long)(Double.parseDouble(values[0])*100000000L);
+							int delay = Integer.parseInt(values[1]);
+							if(delay<=0)delay=1;
 							try{
 								if(player!=seller||DEBUG){
-									String cID=ReddconomyApi.createContract(ammount,sellerUUID);
+									String cID=ReddconomyApi.createContract(amount,sellerUUID);
 									int status=ReddconomyApi.acceptContract(cID,pUUID);
 									// This activates the redstone only if the contract replied with 200
 									if(status==200){
 										player.sendMessage(Text.of("Contract ID: "+cID));
 										player.sendMessage(Text.of("Contract accepted."));
+										_ACTIVATED_SIGNS.put(location,true);
 										location.setBlockType(BlockTypes.REDSTONE_TORCH);
 										Task.builder().execute(() -> {
 											BlockState state=origsign.getDefaultState();
@@ -277,11 +286,11 @@ public class ReddconomyFrontend implements CommandListener{
 											FrontendUtils.setLine(tile2,1,Text.of(line1));
 											FrontendUtils.setLine(tile2,2,Text.of(line2));
 											FrontendUtils.setLine(tile2,3,Text.of(line3));
+											_ACTIVATED_SIGNS.remove(location);
 										})
-										.delay(5,TimeUnit.MILLISECONDS)
+										.delay(delay,TimeUnit.MILLISECONDS)
 										.name("Powering off Redstone.")
 										.submit(this);
-
 									}else{
 										player.sendMessage(Text.of(TextColors.DARK_RED,"Check your balance. Cannot accept contract"));
 									}
@@ -294,10 +303,21 @@ public class ReddconomyFrontend implements CommandListener{
 								e.printStackTrace();
 							}
 						}
-
-					}else if(!PLUGIN_CONTRACT_SIGNS) player.sendMessage(Text.of(TextColors.BLUE,"Contract Signs aren't enabled. Sorry about that."));
+					}
 				}
 			}
+		}
+	}
+	
+	@Listener (order=Order.FIRST)
+	public void onRedstoneBreak (ChangeBlockEvent.Break event)
+	{
+		if(event.isCancelled())return;
+		for (Transaction<BlockSnapshot> trans : event.getTransactions()) {
+			if(!trans.getOriginal().getState().getType().equals(BlockTypes.REDSTONE_TORCH))continue;
+				Optional<Location<World>> loc = trans.getOriginal().getLocation();
+			if (loc.isPresent() && _ACTIVATED_SIGNS.containsKey(loc.get()))
+				event.setCancelled(true);
 		}
 	}
 

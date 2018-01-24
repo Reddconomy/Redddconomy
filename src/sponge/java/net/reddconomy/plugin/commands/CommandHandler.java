@@ -19,18 +19,11 @@
 package net.reddconomy.plugin.commands;
 
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.Optional;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 import org.spongepowered.api.command.CommandException;
 import org.spongepowered.api.command.CommandResult;
 import org.spongepowered.api.command.CommandSource;
 import org.spongepowered.api.command.args.CommandContext;
 import org.spongepowered.api.command.spec.CommandExecutor;
-
-import com.google.inject.Inject;
 
 import net.reddconomy.plugin.commands.CommandListener;
 
