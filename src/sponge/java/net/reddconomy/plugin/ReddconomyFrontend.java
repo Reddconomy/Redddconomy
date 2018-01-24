@@ -73,6 +73,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -87,7 +88,7 @@ public class ReddconomyFrontend implements CommandListener{
 	private boolean PLUGIN_CONTRACT_SIGNS;
 	private boolean CAN_RUN=true;
 	private boolean DEBUG;
-	private boolean CANCEL=false;
+	Map<Location<World>,Boolean> ACTIVATED_SIGNS=new WeakHashMap<Location<World>,Boolean>();
 	private final ConcurrentLinkedQueue<String> _PENDING_DEPOSITS=new ConcurrentLinkedQueue<String>();
 	
 	// CONFIG BLOCK
@@ -152,7 +153,7 @@ public class ReddconomyFrontend implements CommandListener{
 		API_QR=config.get("qr").toString();
 		PLUGIN_CONTRACT_SIGNS=(boolean)config.get("csigns");
 		DEBUG=(boolean)config.get("debug");
-		int version=(int)config.get("ConfigVersion");
+		int version=((Number)config.get("ConfigVersion")).intValue();
 		logger.log(Level.INFO,"Configfile version is "+version+".");
 		
 		
@@ -233,9 +234,7 @@ public class ReddconomyFrontend implements CommandListener{
 				TileEntity tile=location.getTileEntity().get();
 				if(tile instanceof Dispenser||tile instanceof Dropper){
 					if(!FrontendUtils.canPlayerOpen(location,player.getName())&&!FrontendUtils.isOp(player)){
-
 						player.sendMessage(Text.of(TextColors.DARK_RED,"[CONTRACT] Only the owner can open this container."));
-						if(FrontendUtils.isOp(player)) player.sendMessage(Text.of("You're op btw."));
 						event.setCancelled(true);
 					}
 				}
@@ -276,7 +275,7 @@ public class ReddconomyFrontend implements CommandListener{
 									if(status==200){
 										player.sendMessage(Text.of("Contract ID: "+cID));
 										player.sendMessage(Text.of("Contract accepted."));
-										CANCEL=true;
+										ACTIVATED_SIGNS.put(location,true);
 										location.setBlockType(BlockTypes.REDSTONE_TORCH);
 										Task.builder().execute(() -> {
 											BlockState state=origsign.getDefaultState();
@@ -287,11 +286,11 @@ public class ReddconomyFrontend implements CommandListener{
 											FrontendUtils.setLine(tile2,1,Text.of(line1));
 											FrontendUtils.setLine(tile2,2,Text.of(line2));
 											FrontendUtils.setLine(tile2,3,Text.of(line3));
+											ACTIVATED_SIGNS.remove(location);
 										})
 										.delay(delay,TimeUnit.MILLISECONDS)
 										.name("Powering off Redstone.")
 										.submit(this);
-										CANCEL=false;
 									}else{
 										player.sendMessage(Text.of(TextColors.DARK_RED,"Check your balance. Cannot accept contract"));
 									}
@@ -304,25 +303,21 @@ public class ReddconomyFrontend implements CommandListener{
 								e.printStackTrace();
 							}
 						}
-
 					}
 				}
 			}
 		}
 	}
 	
-	public void onRedstoneBreak (ChangeBlockEvent.Break event, boolean CANCEL, Location<World> location)
+	@Listener (order=Order.FIRST)
+	public void onRedstoneBreak (ChangeBlockEvent.Break event)
 	{
 		if(event.isCancelled())return;
 		for (Transaction<BlockSnapshot> trans : event.getTransactions()) {
-		if(trans.getOriginal().getState().getType().equals(BlockTypes.REDSTONE_TORCH))continue;
-		Optional<Location<World>> loc = trans.getOriginal().getLocation();
-		if (loc.isPresent() && loc.get().equals(location)) {
-				if (CANCEL)
-				{
-					event.setCancelled(CANCEL);
-				}
-			}
+			if(!trans.getOriginal().getState().getType().equals(BlockTypes.REDSTONE_TORCH))continue;
+				Optional<Location<World>> loc = trans.getOriginal().getLocation();
+			if (loc.isPresent() && ACTIVATED_SIGNS.containsKey(loc.get()))
+				event.setCancelled(true);
 		}
 	}
 
