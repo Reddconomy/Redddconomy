@@ -88,7 +88,7 @@ public class ReddconomyFrontend implements CommandListener{
 	private boolean PLUGIN_CONTRACT_SIGNS;
 	private boolean CAN_RUN=true;
 	private boolean DEBUG;
-	Map<Location<World>,Boolean> ACTIVATED_SIGNS=new WeakHashMap<Location<World>,Boolean>();
+	private final Map<Location<World>,Boolean> _ACTIVATED_SIGNS=new WeakHashMap<Location<World>,Boolean>();
 	private final ConcurrentLinkedQueue<String> _PENDING_DEPOSITS=new ConcurrentLinkedQueue<String>();
 	
 	// CONFIG BLOCK
@@ -275,7 +275,7 @@ public class ReddconomyFrontend implements CommandListener{
 									if(status==200){
 										player.sendMessage(Text.of("Contract ID: "+cID));
 										player.sendMessage(Text.of("Contract accepted."));
-										ACTIVATED_SIGNS.put(location,true);
+										_ACTIVATED_SIGNS.put(location,true);
 										location.setBlockType(BlockTypes.REDSTONE_TORCH);
 										Task.builder().execute(() -> {
 											BlockState state=origsign.getDefaultState();
@@ -286,7 +286,7 @@ public class ReddconomyFrontend implements CommandListener{
 											FrontendUtils.setLine(tile2,1,Text.of(line1));
 											FrontendUtils.setLine(tile2,2,Text.of(line2));
 											FrontendUtils.setLine(tile2,3,Text.of(line3));
-											ACTIVATED_SIGNS.remove(location);
+											_ACTIVATED_SIGNS.remove(location);
 										})
 										.delay(delay,TimeUnit.MILLISECONDS)
 										.name("Powering off Redstone.")
@@ -316,7 +316,7 @@ public class ReddconomyFrontend implements CommandListener{
 		for (Transaction<BlockSnapshot> trans : event.getTransactions()) {
 			if(!trans.getOriginal().getState().getType().equals(BlockTypes.REDSTONE_TORCH))continue;
 				Optional<Location<World>> loc = trans.getOriginal().getLocation();
-			if (loc.isPresent() && ACTIVATED_SIGNS.containsKey(loc.get()))
+			if (loc.isPresent() && _ACTIVATED_SIGNS.containsKey(loc.get()))
 				event.setCancelled(true);
 		}
 	}
