@@ -61,7 +61,7 @@ import it.reddconomy.plugin.contracts.ContractInitialization;
 import it.reddconomy.plugin.contracts.ContractSign;
 import it.reddconomy.plugin.utils.FrontendUtils;
 
-@Plugin(id="reddconomy-sponge", name="Reddconomy-sponge", version="0.1.1")
+@Plugin(id="reddconomy-sponge", name="Reddconomy-sponge", version="0.2.0")
 public class ReddconomyFrontend implements CommandListener{
 	@Inject	private Game GAME;
 	@Inject	private Logger LOGGER;
