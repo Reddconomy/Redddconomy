@@ -21,6 +21,7 @@ package it.reddconomy.plugin;
 import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
@@ -33,6 +34,7 @@ import java.util.logging.Logger;
 import org.spongepowered.api.Game;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.block.BlockState;
+import org.spongepowered.api.block.BlockType;
 import org.spongepowered.api.block.BlockTypes;
 import org.spongepowered.api.block.tileentity.TileEntity;
 import org.spongepowered.api.command.CommandSource;
@@ -52,6 +54,7 @@ import org.spongepowered.api.text.action.TextActions;
 import org.spongepowered.api.text.format.TextColors;
 import org.spongepowered.api.text.format.TextStyles;
 import org.spongepowered.api.util.Direction;
+import org.spongepowered.api.world.LocatableBlock;
 
 import com.google.inject.Inject;
 
@@ -319,10 +322,20 @@ public class ReddconomyFrontend implements CommandListener{
 										+"\nYou have now: "+Utils.convertToUserFriendly(ReddconomyApi.getWallet(cdata.player_wallet.id).balance)+" "+ReddconomyApi.getInfo().coin_short));
 
 								ContractSign._ACTIVATED_SIGNS.add(cdata.sign_location.getBlockPosition());
-						
-								cdata.sign_location.setBlockType(
-										ContractSign._BLOCK_BLACKLIST.contains(cdata.sign_location.getRelative(Direction.DOWN).getBlockType())
-										?BlockTypes.REDSTONE_BLOCK:BlockTypes.REDSTONE_TORCH);
+													
+								// TODO: Check if the sign can be converted to a torch, if can't, it tries to put a wall torch and if still can't, it'll put a redstone block.
+								if (ContractSign._BLOCK_BLACKLIST.contains(cdata.sign_location.getRelative(Direction.DOWN).getBlockType()))
+										if (ContractSign.canHostWallTorch(cdata.sign_location,Direction.EAST)) {
+											cdata.sign_location.setBlock(ContractSign.doWallTorch(cdata.sign_location,Direction.EAST));
+										} else if (ContractSign.canHostWallTorch(cdata.sign_location,Direction.WEST)) {
+											cdata.sign_location.setBlock(ContractSign.doWallTorch(cdata.sign_location,Direction.WEST));
+										} else if (ContractSign.canHostWallTorch(cdata.sign_location,Direction.NORTH)) {
+											cdata.sign_location.setBlock(ContractSign.doWallTorch(cdata.sign_location,Direction.NORTH));
+										} else if (ContractSign.canHostWallTorch(cdata.sign_location,Direction.SOUTH)) {
+											cdata.sign_location.setBlock(ContractSign.doWallTorch(cdata.sign_location,Direction.SOUTH));
+										} else cdata.sign_location.setBlock(BlockTypes.REDSTONE_BLOCK.getDefaultState());
+								else cdata.sign_location.setBlock(BlockTypes.REDSTONE_TORCH.getDefaultState());
+									
 								Task.builder().execute(() -> {
 									if(cdata.sign_location.getBlock().getType()!=BlockTypes.REDSTONE_TORCH&&cdata.sign_location.getBlock().getType()!=BlockTypes.REDSTONE_BLOCK)return;
 

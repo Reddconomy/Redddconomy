@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.block.BlockSnapshot;
+import org.spongepowered.api.block.BlockState;
 import org.spongepowered.api.block.BlockType;
 import org.spongepowered.api.block.BlockTypes;
 import org.spongepowered.api.block.tileentity.Sign;
@@ -142,6 +143,18 @@ public class ContractSign{
 		return Arrays.asList(sr_entities);
 		
 	}
+    
+    public static boolean canHostWallTorch(Location<World> loc, Direction dir)
+    {
+		    	if (!(loc.getRelative(dir).getBlockType().equals(BlockTypes.AIR))&&!(ContractSign._BLOCK_BLACKLIST.contains(loc.getRelative(dir).getBlockType())))
+		    		return true;
+		    	else return false;
+    }
+    
+    public static BlockState doWallTorch(Location<World> loc, Direction dir)
+    {
+		    	return BlockTypes.REDSTONE_TORCH.getDefaultState().with(Keys.DIRECTION, dir.getOpposite()).get();
+    }
 
     public static void createContractSignFromSign(TileEntity sign) throws Exception{
     	String contract_owner=getLine(sign,3);
